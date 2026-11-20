@@ -270,3 +270,31 @@ aside p {
     width: 210px;
   }
 }
+.left {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.left > .signature {
+  position: static;
+  margin: 18px 0 16px 22px;
+}
+nav,
+.layers,
+.warp-panel {
+  flex-shrink: 0;
+}
+.tip {
+  margin-top: 40px;
+}
+footer .warp-error {
+  color: #c03f6c;
+  font-weight: 600;
+}
+.source-ghost {
+  fill: none;
+  stroke: #b39ddb;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+}

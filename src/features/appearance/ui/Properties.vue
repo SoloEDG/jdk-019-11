@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { active } from "../model/active";
+import { active, countNodes } from "../model/active";
 import { style } from "../model/style";
 import { colors } from "../lib/colors";
 </script>
@@ -54,7 +54,7 @@ import { colors } from "../lib/colors";
           @input="style('opacity', +($event.target as HTMLInputElement).value)"
       /></label>
       <h4>PATH DETAILS</h4>
-      <p>{{ active.nodes.length }} anchor points</p>
+      <p>{{ countNodes() }} anchor points</p>
       <label
         >Closed path
         <input

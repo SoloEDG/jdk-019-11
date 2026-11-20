@@ -3,7 +3,7 @@ import { computed, watch } from "vue";
 import { doc } from "../shared/document";
 import {
   Tools,
-  path,
+  pathD,
   create,
   add,
   seed,
@@ -16,13 +16,53 @@ import { NodeOverlay, coordinates, select } from "../features/nodes";
 import { Properties } from "../features/appearance";
 import { Layers, translateSelected } from "../features/layers";
 import { ExportBar, restore, save, storageStatus } from "../features/export";
+import {
+  WarpPanel,
+  outline,
+  exportOutline,
+  isExpanded,
+  previewTolerance,
+  spaceOf,
+  selectionTargets,
+  warpStatus,
+} from "../features/warp";
+import { WarpOverlay } from "../features/warp/ui";
+import { clearStatus, pruneWarps } from "../features/warp/model/ops";
 import type { Shape } from "../shared/types";
+
 if (!restore()) seed();
 doc.selected = doc.shapes.length
   ? [doc.shapes[Math.min(3, doc.shapes.length - 1)].id]
   : [];
 watch(() => doc.shapes, save, { deep: true });
-const paths = computed(() => doc.shapes.map(path));
+watch(() => doc.warps, save, { deep: true });
+watch(
+  () => doc.shapes.map((s) => s.id),
+  () => pruneWarps(),
+);
+
+/** Painted outlines: adaptive for live effects, baked for expanded ones. */
+const display = computed(() => {
+  doc.zoom; // re-resolve preview resolution when magnification changes
+  return doc.shapes.map((s) => {
+    const space = spaceOf(s);
+    const nodes =
+      s.warp?.baked ??
+      (space ? outline(s, previewTolerance(space, doc.zoom)) : s.nodes);
+    return { shape: s, d: pathD(nodes, s.closed) };
+  });
+});
+const exportPaths = computed(() =>
+  doc.shapes.map((s) => pathD(exportOutline(s), s.closed)),
+);
+/** Ghost of the undeformed master path while a live warp is applied. */
+const sources = computed(() =>
+  doc.shapes
+    .filter((s) => s.warp && !isExpanded(s) && doc.selected.includes(s.id))
+    .map((s) => ({ id: s.id, d: pathD(s.nodes, s.closed) })),
+);
+const warped = computed(() => selectionTargets().length > 0);
+
 let drawing: Shape | undefined;
 watch(
   () => doc.tool,
@@ -32,7 +72,12 @@ watch(
 );
 watch(revision, () => {
   drawing = undefined;
+  clearStatus();
 });
+watch(
+  () => doc.selected.join(","),
+  () => clearStatus(),
+);
 function down(e: PointerEvent) {
   const svg = e.currentTarget as SVGSVGElement;
   const p = coordinates(e, svg);
@@ -82,13 +127,14 @@ window.addEventListener("keydown", (e) => {
   <header>
     <b class="brand">◈ forma <small>VECTOR STUDIO</small></b>
     <div>Bloom exploration <span> / Personal workspace</span></div>
-    <ExportBar :paths="paths" />
+    <ExportBar :paths="exportPaths" />
   </header>
   <div class="workspace">
     <div class="left">
       <h5>PROJECT <span>＋</span></h5>
       <p class="project">▣ Bloom / Artboard 01</p>
       <Tools /><Layers />
+      <WarpPanel />
       <p class="signature">✧ Designed to explore.</p>
     </div>
     <main>
@@ -117,25 +163,32 @@ window.addEventListener("keydown", (e) => {
         >
           <rect width="800" height="600" fill="#fffdfb" />
           <path
-            v-for="s in doc.shapes"
-            :key="s.id"
-            :data-shape="s.id"
-            :d="path(s)"
-            :fill="s.fill"
-            :stroke="s.stroke"
-            :stroke-width="s.width"
-            :opacity="s.opacity"
+            v-for="s in display"
+            :key="s.shape.id"
+            :data-shape="s.shape.id"
+            :d="s.d"
+            :fill="s.shape.fill"
+            :stroke="s.shape.stroke"
+            :stroke-width="s.shape.width"
+            :opacity="s.shape.opacity"
+          />
+          <path
+            v-for="s in sources"
+            :key="'src-' + s.id"
+            :d="s.d"
+            class="source-ghost"
+            data-testid="source-ghost"
           />
           <NodeOverlay />
+          <WarpOverlay v-if="warped && doc.tool !== 'nodes'" />
         </svg>
       </div>
       <footer>
         <span>● {{ storageStatus }}</span
-        ><span>{{
-          doc.tool === "pen"
-            ? "Click / drag to draw · Enter to finish"
-            : "Shift + click to select multiple · Drag to move"
-        }}</span
+        ><span
+          :class="{ 'warp-error': !warpStatus.ok }"
+          data-testid="status-message"
+          >{{ warpStatus.message }}</span
         ><span>{{ doc.selected.length }} selected</span>
       </footer>
     </main>

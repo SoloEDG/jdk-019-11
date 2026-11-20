@@ -1,6 +1,6 @@
-import type { Shape } from "../../../shared/types";
-export function translate(s: Shape, x: number, y: number) {
-  s.nodes.forEach((n) => {
+import type { Node, Shape } from "../../../shared/types";
+export function translate(s: Pick<Shape, "nodes">, x: number, y: number) {
+  s.nodes.forEach((n: Node) => {
     n.x += x;
     n.y += y;
     n.in.x += x;
